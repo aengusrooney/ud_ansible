@@ -1,0 +1,49 @@
+# Jenkins Backup Node #
+
+[jenkins]
+172.16.1.205 ansible_port=22 ansible_user=root ansible_ssh_private_key_file=~/.ssh/id_rsa 
+
+[mylab]
+172.16.1.116 ansible_port=22 ansible_user=root ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+[unravel_server]
+#172.36.1.138 ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat
+3.81.142.225 ansible_port=22 ansible_user=ec2-user ansible_ssh_private_key_file=~/.ssh/aws_tc
+
+[congo4142]
+172.36.1.141 ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat
+172.36.1.142 ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat
+
+
+[lab_machines]
+congo43  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo44  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo45  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo46  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo47  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo48  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo49  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo50  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo51  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo52  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo53  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+172.16.1.61  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+
+[colo58to74]
+congo58  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo59  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo60  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo61  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo62  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo63  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo64  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo65  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo66  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo67  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo68  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo69  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo70  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo71  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo72  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo73  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'
+congo74  ansible_port=22 ansible_user=topcat ansible_ssh_private_key_file=~/.ssh/topcat ansible_ssh_common_args='-o StrictHostKeyChecking=no'

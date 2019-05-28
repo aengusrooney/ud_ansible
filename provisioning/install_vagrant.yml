@@ -1,0 +1,49 @@
+---
+- hosts: all
+  gather_facts: yes
+  remote_user: topcat
+  become: true
+  become_method: sudo
+
+  tasks:
+
+       - name: Download Vagrant rpm
+         get_url:
+           url: "https://releases.hashicorp.com/vagrant/{{vagrant_version}}/vagrant_{{vagrant_version}}_{{ansible_architecture}}.rpm"
+           dest: /tmp/
+           force: yes
+         register: download_vagrant_result
+         when: ansible_os_family == "RedHat"
+
+       - name: Output downloaded Vagrant file name
+         debug:
+           var: download_vagrant_result.dest
+           verbosity: 1
+         when: ansible_os_family == "RedHat"
+       
+       - name: Install Vagrant
+         yum:
+           name: /tmp/vagrant_{{vagrant_version}}_{{ansible_architecture}}.rpm
+           state: present
+       
+       - name: Execute Vagrant Command
+         command: vagrant --version
+         register: vagrant_ver
+         tags: verify_vagrant
+
+       - name: Verify Vagrant Version
+         assert:
+          that:
+            - "vagrant_ver.stdout  <= 'Vagrant {{ vagrant_version }}'"
+         tags: verify_vagrant
+
+       # Add Guest addons plugin & vagrant plugin install vagrant-vbguest #
+       - name: Install Vagrant Plugins 
+         command: "vagrant plugin install {{ item }}"
+         with_items:
+           - vagrant-host-shell 
+           - vagrant-hostmanager 
+           - vagrant-disksize
+
+  vars:
+    vagrant_version: 2.2.2

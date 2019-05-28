@@ -1,0 +1,80 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+require 'fileutils'
+
+CONF = YAML.load(File.open(File.join(File.dirname(__FILE__), "vagrantconfig.yml"), File::RDONLY).read)
+
+def create_shell_script(hostname)
+    script = <<-SCRIPT
+    echo Editing /etc/hosts file
+    sed -i '/^127.0.0.1\\s*#{hostname}/d' /etc/hosts
+    sed -i '/^::1/d' /etc/hosts
+    echo "Disabling SELinux "
+    sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+    echo "Disabling Transparent Huge Page Compaction"
+    echo never > /sys/kernel/mm/transparent_hugepage/defrag
+    echo never > /sys/kernel/mm/transparent_hugepage/enabled
+    #sudo yum update -y
+SCRIPT
+end
+
+# TODO : One disk to 100GB size #
+Vagrant.configure(2) do |config|
+  config.hostmanager.enabled = true
+  config.hostmanager.ignore_private_ip = false
+  # create worker host(s)
+  (1..CONF['worker_instances']).each do |i|
+   config.vm.define "#{CONF['workers']}#{i}" do |ws2_config|
+    ws2_config.vm.box = CONF['box'] 
+    hostname = "#{CONF['workers']}#{i}.unraveldata.com"
+    ws2_config.vm.hostname = "#{hostname}"
+    ws2_config.vm.network :private_network, ip: "#{CONF['ip']}#{i}"
+    for j in "#{CONF['worker_ports']}".split(',') 
+      ws2_config.vm.network :forwarded_port, guest: j, host: j
+    end
+    ws2_config.vm.provider :virtualbox do |vb|
+      vb.customize ["modifyvm", :id, "--memory", CONF['worker_memory_size']]
+      vb.customize ['modifyvm', :id, '--cpus', CONF['worker_number_cpus']]
+    end
+    hosts_script= create_shell_script(hostname)
+    puts "Hostname is ... #{hostname} #{hosts_script}"
+    ws2_config.vm.provision "shell", inline: "#{hosts_script}"
+    ws2_config.vm.provision :host_shell do |host_shell|
+     host_shell.inline ="cp -f ./.vagrant/machines/#{CONF['workers']}#{i}/virtualbox/private_key ./#{CONF['workers']}#{i}_key"
+   end
+   end
+  end
+  # create master host
+  config.vm.define CONF['master'] do |tnode|
+    tnode.vm.box = CONF['box'] 
+    hostname = "#{CONF['master']}.unraveldata.com"
+    tnode.vm.hostname = "#{hostname}"
+    tnode.vm.network :private_network, ip: "#{CONF['ip']}" 
+    for i in "#{CONF['master_ports']}".split(',')
+      tnode.vm.network :forwarded_port, guest: i, host: i
+    end
+    tnode.vm.provider :virtualbox do |vb|
+      vb.customize ["modifyvm", :id, "--memory", CONF['master_memory_size']]
+      vb.customize ['modifyvm', :id, '--cpus', CONF['master_number_cpus']]
+    end
+    tnode.vm.synced_folder "devops", "/devops"
+    hosts_script = create_shell_script(hostname)
+    puts "Hostname is ... #{hostname} #{hosts_script}"
+    tnode.vm.provision "shell", inline: "#{hosts_script}"
+    tnode.vm.provision :host_shell do |host_shell|
+     host_shell.inline ="cp -f ./.vagrant/machines/#{CONF['master']}/virtualbox/private_key ./#{CONF['master']}_key"
+   end
+# TODO : copy the private_key of the hosts to /cloudera_install , format nodename_private_key #
+    tnode.vm.provision :ansible_local do |ansible|
+      verbose                = '-vvv'
+      ansible.playbook       = "/devops/cloudera_install/cloudera_install/cloudera.yml"
+      ansible.become         = true
+      ansible.verbose        = true
+      ansible.install        = true
+      ansible.limit          = "all" # or only "nodes" group, etc.
+      ansible.inventory_path = "/devops/cloudera_install/cloudera_install/hosts"
+    end
+    tnode.vm.provision "shell", inline: "cd /devops; python cloudformation/cloudera/cluster.py --host #{CONF['ip']} -t cloudformation/cloudera/template/vm_2_nodes.json -a deploy-template -v #{CONF['cdh_version']}"
+    tnode.vm.provision "shell", inline: "cd /devops; python cloudformation/cloudera/cluster.py --host #{CONF['ip']} -a deploy-cms"
+  end
+end

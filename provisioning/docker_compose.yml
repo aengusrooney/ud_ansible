@@ -1,0 +1,28 @@
+---
+- hosts: jenkins
+  gather_facts: yes
+  remote_user: topcat
+  become: true
+  become_method: sudo
+
+  tasks:
+
+       - name: Update the software package repository 
+         yum: update_cache=yes
+         when: ansible_os_family == "RedHat"
+
+       - name: Install docker dependencies
+         yum:
+          name: epel-release
+         when: ansible_os_family == "RedHat"
+       - name: Install docker-compose 
+         command: 'curl -L https://github.com/docker/compose/releases/download/1.23.1/docker-compose-Linux-x86_64 -o /usr/local/bin/docker-compose' 
+         args:
+           creates: /usr/local/bin/docker-compose
+           warn: false # set warn=false to prevent warning
+       - name: Fix Permissions on  docker-compose 
+         file: 
+           path: '/usr/local/bin/docker-compose' 
+           state: file
+           mode: 0755
+

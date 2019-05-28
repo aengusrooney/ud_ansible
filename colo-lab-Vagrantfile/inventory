@@ -1,0 +1,15 @@
+[provision]
+tnode12 ansible_user=root ansible_ssh_pass=unraveldata
+
+[server]
+tnode12 ansible_connection=ssh ansible_user=root ansible_ssh_pass=unraveldata
+
+[agent]
+tnode12 ansible_connection=ssh ansible_user=root ansible_ssh_pass=unraveldata
+
+
+[all:vars]
+cdh_ver=5.15.1
+ambari_ver=2.6.2.2
+cm_hostname=tnode12
+ambari_hostname=tnode12

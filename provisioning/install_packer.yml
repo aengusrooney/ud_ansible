@@ -1,0 +1,29 @@
+---
+- hosts: all
+  gather_facts: yes
+  remote_user: topcat
+  become: true
+  become_method: sudo
+
+  tasks:
+
+       - name: Download & Install Packer
+         unarchive:
+           src: "https://releases.hashicorp.com/packer/{{ packer_version }}/packer_{{ packer_version }}_linux_amd64.zip"
+           dest: /usr/local/bin
+           remote_src: yes
+           list_files: yes
+         when: ansible_os_family == "RedHat"
+
+       - name: Execute Packer Command
+         command: /usr/local/bin/packer --version
+         register: packer_ver
+
+       - name: Verify Packer Version
+         assert:
+          that:
+            - "packer_ver.stdout  <= 'Packer {{ packer_version }}'"
+
+  vars:
+    packer_version: 1.3.3
+    packer_home: /usr/local/packer

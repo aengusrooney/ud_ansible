@@ -1,0 +1,6 @@
+---
+# Install and configure build tools.
+
+- name: install gcc
+  yum: name=gcc
+       state=present

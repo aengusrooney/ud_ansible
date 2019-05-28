@@ -1,0 +1,128 @@
+---
+- hosts: all
+  gather_facts: yes
+  remote_user: vagrant
+  become: true
+  become_method: sudo
+
+  tasks:
+
+       - name: Download Java rpm
+         get_url:
+           url: "https://s3.amazonaws.com/unraveldatarepo/jdk-8u112-linux-x64.rpm"
+           dest: /tmp/
+           force: no
+         register: download_unravel
+         when: ansible_os_family == "RedHat"
+         tags: download_java_rpm
+
+       - name: Output downloaded Unravel file name
+         debug:
+           var: download_unravel.dest
+           verbosity: 1
+         when: ansible_os_family == "RedHat"
+
+       - name: Install Java
+         yum:
+           name: /tmp/jdk-8u112-linux-x64.rpm
+           state: present
+
+       - name: Add JAVA_HOME to /etc/profile
+         lineinfile:
+           path: /etc/profile 
+           line: 'export JAVA_HOME=/usr/java/jdk1.8.0_112/jre'           
+       
+       - name: Add JAVA to PATH in  /etc/profile
+         lineinfile:
+           path:  /etc/profile
+           line: 'export PATH=$PATH:/usr/java/jdk1.8.0_112/jre/bin'           
+
+       - name: Install Essentials Packages
+         yum:
+           name:
+             - ntp
+             - setroubleshoot-server
+             - bind-utils
+             - sssd
+             - realmd
+             - oddjob
+             - oddjob-mkhomedir
+             - adcli
+             - samba-common
+             - samba-common-tools
+             - krb5-workstation
+             - openldap-clients
+             - policycoreutils-python
+             - libaio
+             - lzop
+           state: present
+         tags: install_pkgs
+
+       - name: Start and enable ntpd
+         service:
+           name: ntpd 
+           state: started
+           enabled: yes
+
+# Password generated using mkpasswd --method sha-512 on OSx or use Python #
+# python -c "from passlib.hash import sha512_crypt; import getpass; print sha512_crypt.encrypt(getpass.getpass())" #
+       - name: Ensure group "topcat" exists
+         group:
+           name: topcat
+           state: present
+
+       - name: Create topcat user
+         user:
+           name: topcat
+           group: topcat
+           password: $6$S/2xZ3KlENwlqkpF$30slrFQpCSC9k3qYsL35PbejvULq.Da1TRKBIqiI0D7qGGI6b4ZHGovN58VHFzq/22CA5iMe5Q4ZRLPRV8Cnt/
+
+       - name: Chnage password for root user
+         user:
+            name: root
+            password: $6$S/2xZ3KlENwlqkpF$30slrFQpCSC9k3qYsL35PbejvULq.Da1TRKBIqiI0D7qGGI6b4ZHGovN58VHFzq/22CA5iMe5Q4ZRLPRV8Cnt/
+
+       - name: Disable SELinux
+         selinux:
+           state: disabled
+
+       - name: Set swappiness to 10 in /etc/sysctl.conf
+         sysctl:
+           name: vm.swappiness
+           value: 10
+           state: present
+           reload: yes
+
+       - name: Disable ipv6 
+         sysctl:
+           name: net.ipv6.conf.all.disable_ipv6 
+           value: 1
+           state: present
+           reload: yes
+       
+       - name: Disable ipv6 set default 
+         sysctl:
+           name: net.ipv6.conf.default.disable_ipv6 
+           value: 1
+           state: present
+           reload: yes
+
+       - name: Joining the Windows AD
+         shell: | 
+            echo coloAdmin123! | realm join --user=administrator unraveldata.com
+            sed -i '/^use\_fully\_qualified\_names/s/True/False/' /etc/sssd/sssd.conf
+            sed -i '/^fallback_homedir/s/\%u\@\%d/\%u/' /etc/sssd/sssd.conf
+
+       - name: Restart sssd service
+         service:
+           name: sssd
+           state: restarted
+           enabled: yes
+
+       #- name: Ansible Insert multiple lines using blockinfile
+       #  blockinfile:
+       #    dest: /home/mdtutorials2/block_output.txt
+       #    block: |
+       #      net.ipv6.conf.all.disable_ipv6 = 1 
+       #      net.ipv6.conf.default.disable_ipv6 = 1 
+

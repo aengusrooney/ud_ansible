@@ -1,0 +1,3 @@
+requests
+ansible
+cm_api==19.0.0

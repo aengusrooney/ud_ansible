@@ -1,0 +1,43 @@
+---
+- hosts: all
+  become: yes
+  become_user: root 
+  tasks:
+ 
+    - name: Copy sudoers file for safety
+      command: cp -f /etc/sudoers /etc/sudoers.tmp 
+      args:
+        creates: /etc/sudoers.tmp
+ 
+    - name: Create sudoers file backup
+      command: cp -f /etc/sudoers /etc/sudoers.bak 
+      args:
+        creates: /etc/sudoers.bak
+ 
+    - name: Create topcat group
+      group: name=topcat system=yes state=present
+ 
+    - name: make sure we can sudo as admin group
+      lineinfile: dest=/etc/sudoers.tmp state=present regexp='^%topcat' line='%topcat ALL=(ALL) NOPASSWD:ALL'
+ 
+    - name: also make sure ssh-agent works via sudo
+      lineinfile: dest=/etc/sudoers.tmp state=present regexp='^Defaults env_keep\+\=SSH_AUTH_SOCK' line='Defaults env_keep+=SSH_AUTH_SOCK'
+        
+    - name: Adding Multiple Users and Appending in Sudoers file
+      user: 
+       name: "{{ item }}"
+       system: no
+       append: yes
+       group: topcat
+       groups: wheel
+       home: /home/{{ item }}
+      with_items:
+        - topcat
+ 
+    #- name: Set up authorized keys for the user
+    #  authorized_key: user=raghu key="{{item}}"
+    #  with_file:
+    #    - /home/ansadm/.ssh/id_rsa.pub
+ 
+    - name: Final sudoers file check
+      shell: visudo -q -c -f /etc/sudoers.tmp && cp -f /etc/sudoers.tmp /etc/sudoers

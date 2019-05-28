@@ -1,0 +1,118 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+CONF = YAML.load(File.open(File.join(File.dirname(__FILE__), "vagrantconfig.yml"), File::RDONLY).read)
+
+
+$hostname = <<-`command`
+hostname
+command
+$n_host = $hostname.strip
+
+$msg = <<-MSG
+------------------------------------------------------
+Cloudera Manager 
+URLS:
+- http://#{$n_host}/
+
+------------------------------------------------------
+MSG
+
+puts "Following are the Cofig values specified #{$msg}"
+CONF.each do |key, value|
+  puts "The Config key is #{key} and the value is #{value}."
+end
+
+$script = <<-SCRIPT
+sleep 10
+echo 'nameserver 172.36.1.213' > /etc/resolv.conf
+echo Editing /etc/hosts file 
+sed -i '/^127.0.0.1\\s*#{CONF['worker']}.unraveldata.com/d' /etc/hosts
+sed -i '/^::1/d' /etc/hosts
+sed -i 's/SELINUX\=permissive/SELINUX\=disabled/' /etc/selinux/config
+IPADDRESS=`ifconfig eth1 |grep inet  |grep netmask |grep 172 |awk '{print $2}'`
+sed -i '/unraveldata\.com/d' /etc/hosts
+echo "$IPADDRESS $HOSTNAME" >> /etc/hosts
+sleep 5
+nmcli con mod "eth1" ifname eth1  ip4 $IPADDRESS/16 gw4 172.36.0.254  ipv4.dns "172.36.1.213"
+nmcli connection up eth1
+sed -i 's/ONBOOT\=no/ONBOOT\=yes/' /etc/sysconfig/network-scripts/ifcfg-eth1
+systemctl stop NetworkManager
+systemctl disable NetworkManager
+echo Sleeing 10 
+sleep 10
+sed -i 's:nameserver 10.0.2.3::' /etc/resolv.conf
+route del -net 0.0.0.0/0 gw 10.0.2.2
+echo Making crontab for reboot
+echo -e "@reboot route del -net 0.0.0.0/0 gw 10.0.2.2\n@reboot sed -i 's:nameserver 10.0.2.3::' /etc/resolv.conf" >> rjob
+crontab rjob
+echo Sleep 15
+echo Changing SSHD
+sed -i 's:PasswordAuthentication no:PasswordAuthentication yes:' /etc/ssh/sshd_config
+sed -i 's:\#PermitRootLogin yes:PermitRootLogin yes:' /etc/ssh/sshd_config
+systemctl reload sshd
+echo "topcat            ALL=(ALL)       NOPASSWD: ALL" >> /etc/sudoers
+
+echo Expanding disk
+yum install -y cloud-utils-growpart
+yum install -y e2fsprogs
+growpart /dev/sda 1
+resize2fs /dev/sda1
+
+echo changing root password
+echo "unraveldata" | passwd root --stdin
+echo  adding topcat user
+useradd topcat
+echo "unraveldata" | passwd topcat --stdin
+
+SCRIPT
+
+
+Vagrant.configure("2") do |config|
+  config.hostmanager.enabled = true
+  config.vm.define :"#{CONF['worker']}" do |node|
+    node.vm.box = "#{CONF['box']}"
+    config.vm.network :public_network , bridge: "#{CONF['eth']}" , ip: "#{CONF['ip']}" , netmask:"255.255.0.0" , auto_config: false
+    config.disksize.size = "#{CONF['disk_size']}"
+    master_hostname = "#{CONF['worker']}"
+    master_fqdn = "#{master_hostname}.unraveldata.com"
+    node.vm.hostname = master_fqdn
+    node.vm.provider :virtualbox do |vb|
+      vb.customize ["modifyvm", :id, "--memory", CONF['memory_size']]
+      vb.customize ['modifyvm', :id, '--cpus', CONF['number_cpus']]
+    end
+  # Add the ip to FQDN and hostname mapping in /etc/hosts
+    node.hostmanager.aliases = "#{master_fqdn} #{master_hostname}"
+  end
+
+
+    config.vm.provision "shell",
+     run: "once",
+     inline: "sudo ip link set eth1 down && sleep 60"
+    config.vm.provision "shell",
+     run: "once",
+     inline: "ip addr add #{CONF['ip']}/16 dev eth1"
+    config.vm.provision "shell",
+     run: "once",
+     inline: "ip link set eth1 up"
+    config.vm.provision "shell",
+      run: "once",
+      inline: "sudo yum -y install net-tools"
+    config.vm.provision "shell",
+      run: "once",
+      inline: "sudo route add -net 0.0.0.0/0 gw 172.36.0.254"
+
+
+    config.vm.provision "shell", run: "once", inline: $script
+
+    config.vm.provision :ansible do |ansible|
+      ansible.compatibility_mode = "2.0"
+      ansible.playbook = "unravel_vm_provision.yml"
+      ansible.inventory_path = "inventory"
+      ansible.become = true
+      ansible.verbose = true
+      ansible.host_key_checking = false
+    end
+
+
+end

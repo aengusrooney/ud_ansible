@@ -1,0 +1,123 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+CONF = YAML.load(File.open(File.join(File.dirname(__FILE__), "vagrantconfig.yml"), File::RDONLY).read)
+$script = <<-SCRIPT
+echo Editing /etc/hosts file
+sed -i '/^127.0.0.1\\s*NODENAME.unraveldata.com/d' /etc/hosts
+sed -i '/^::1/d' /etc/hosts
+sed -i 's/SELINUX\=permissive/SELINUX\=disabled/' /etc/selinux/config
+IPADDRESS=`ifconfig eth1 |grep inet  |grep netmask |grep FIRSTOCTET |awk '{print $2}'`
+sed -i '/unraveldata\.com/d' /etc/hosts
+echo "$IPADDRESS $HOSTNAME" >> /etc/hosts
+nmcli con mod "eth1" ifname eth1  ip4 $IPADDRESS/16 gw4 GATEWAY  ipv4.dns "DNSSERVER"
+nmcli connection up eth1
+sed -i 's/ONBOOT\=no/ONBOOT\=yes/' /etc/sysconfig/network-scripts/ifcfg-eth1
+systemctl stop NetworkManager
+systemctl disable NetworkManager
+echo Sleeing 10
+sleep 10
+sed -i 's:nameserver 10.0.2.3::' /etc/resolv.conf
+route del -net 0.0.0.0/0 gw 10.0.2.2
+echo Making crontab for reboot
+echo -e "@reboot route del -net 0.0.0.0/0 gw 10.0.2.2\n@reboot sed -i 's:nameserver 10.0.2.3::' /etc/resolv.conf" >> rjob
+crontab rjob
+echo Sleep 15
+echo Changing SSHD
+sed -i 's:PasswordAuthentication no:PasswordAuthentication yes:' /etc/ssh/sshd_config
+sed -i 's:\#PermitRootLogin yes:PermitRootLogin yes:' /etc/ssh/sshd_config
+systemctl reload sshd
+echo "topcat            ALL=(ALL)       NOPASSWD: ALL" >> /etc/sudoers
+
+echo Expanding disk
+yum install -y cloud-utils-growpart
+yum install -y e2fsprogs
+growpart /dev/sda 1
+resize2fs /dev/sda1
+
+echo "Partitioning Disk /dev/sdb"
+mkdir -p /data
+chmod 777 /data
+echo -e "o\nn\np\n1\n\n\nw" | fdisk /dev/sdb
+
+/usr/sbin/mkfs -t ext4 /dev/sdb1
+
+DISKUUID=`/usr/sbin/blkid |grep ext4 |grep sdb1 | awk '{ print $2}' |sed -e 's/"//g'`
+echo "${DISKUUID}    /data   ext4 defaults  0 0" >> /etc/fstab
+mount -a
+
+
+SCRIPT
+
+$hostname = <<-`command`
+hostname
+command
+$n_host = $hostname.strip
+
+$msg = <<-MSG
+------------------------------------------------------
+Cloudera Manager
+URLS:
+- http://#{$n_host}/
+
+------------------------------------------------------
+MSG
+
+puts "Following are the Cofig values specified #{$msg}"
+CONF.each do |key, value|
+  puts "The Config key is #{key} and the value is #{value}."
+end
+
+Vagrant.configure("2") do |config|
+  config.hostmanager.enabled = true
+  config.vm.define :NODENAME do |NODENAME|
+    NODENAME.vm.box = CONF['box']
+    #config.vm.network :public_network , auto_config: false
+    config.vm.network :public_network , bridge: "enp3s0f0" , ip: "NODEIP" , netmask:"255.255.0.0" , auto_config: false
+    config.disksize.size = 'DISKSIZE'
+    master_hostname = "NODENAME"
+    master_fqdn = "#{master_hostname}.unraveldata.com"
+    NODENAME.vm.hostname = master_fqdn
+    NODENAME.vm.provider :virtualbox do |vb|
+      vb.customize ["modifyvm", :id, "--memory", CONF['memory_size']]
+      vb.customize ['modifyvm', :id, '--cpus', CONF['number_cpus']]
+      vb.customize ['createhd', '--filename', './secondDisk1.vdi', '--variant', 'Fixed', '--size', DISK2SIZE * 1024]
+      vb.customize ['storageattach', :id,  '--storagectl', 'IDE', '--port', 1, '--device', 0, '--type', 'hdd', '--medium', './secondDisk1.vdi']
+    end
+  # Add the ip to FQDN and hostname mapping in /etc/hosts
+    NODENAME.hostmanager.aliases = "#{master_fqdn} #{master_hostname}"
+  end
+    config.vm.provision "shell",
+     run: "always",
+     inline: "sudo ip link set eth1 down && sleep 60"
+    config.vm.provision "shell",
+     run: "always",
+     inline: "ip addr add NODEIP/16 dev eth1 && ip link set eth1 up"
+    config.vm.provision "shell",
+      run: "always",
+      inline: "sudo yum update -y; sudo yum -y install net-tools"
+    config.vm.provision "shell",
+      run: "always",
+      inline: "sudo route add -net 0.0.0.0/0 gw GATEWAY"
+    config.vm.provision "shell",
+      run: "always",
+      inline: " echo 'nameserver DNSSERVER' > /etc/resolv.conf"
+
+    config.vm.provision "shell", inline: $script
+    config.vm.provision :ansible_local do |ansible|
+      ansible.compatibility_mode = "2.0"
+      ansible.install = true
+      ansible.playbook = "unravel_vm_provision.yml"
+      ansible.inventory_path = "inventory"
+      ansible.become = true
+      ansible.verbose = true
+    end
+#    config.vm.provision :ansible_local do |ansible|
+#      ansible.compatibility_mode = "2.0"
+#      ansible.install = true
+#      ansible.playbook = "another-ansible-playbook.yml"
+#      ansible.inventory_path = "inventory"
+#      ansible.become = true
+#      ansible.verbose = true
+#    end
+end

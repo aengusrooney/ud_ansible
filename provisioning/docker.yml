@@ -1,0 +1,27 @@
+---
+- hosts: jenkins
+  gather_facts: yes
+  remote_user: topcat
+  become: true
+  become_method: sudo
+
+  tasks:
+
+       - name: Update the software package repository 
+         yum: update_cache=yes
+         when: ansible_os_family == "RedHat"
+
+       - name: Install docker dependencies
+         yum:
+          name: yum-utils, device-mapper-persistent-data, lvm2
+         when: ansible_os_family == "RedHat"
+       - name: Download docker-ce 
+         command: "curl -fsSL https://get.docker.com/ | sh"
+       # If there is error starting docker service ,check /va/log/messages, sometimes system reboot solves the issue #
+       - name: " Starting and Enabling Docker service"
+         service:
+          name: docker
+          state: started
+          enabled: yes
+         when: ansible_os_family == "RedHat"
+

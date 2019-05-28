@@ -1,0 +1,43 @@
+---
+git_install_from_source: true
+git_version: "2.2.1"
+git_install_path: "/opt"
+git_install_from_source_force_update: true
+maven_version: '3.5.4'
+maven_install_dir: /opt/maven
+maven_is_default_installation: yes
+java_license_declaration: 'I accept the "Oracle Binary Code License Agreement for the Java SE Platform Products and JavaFX" under the terms at http://www.oracle.com/technetwork/java/javase/terms/license/index.html'
+java_version: '8u192'
+java_is_default_installation: yes
+jenkins_version: "2.156"
+workspace: /tmp
+ruby_install_bundler: false
+ruby_install_from_source: true
+ruby_download_url: http://cache.ruby-lang.org/pub/ruby/2.0/ruby-2.0.0-p648.tar.gz
+ruby_version: 2.0.0-p648 
+python3_pyenv: "3.5.6"
+python3_command: python3.5
+python3_bashrc: "/home/vagrant/.bash_profile"
+python3_local: "/home/vagrant/.local/bin"
+python_tmp: /tmp
+python_url: https://www.python.org/ftp/python/3.5.6/Python-3.5.6.tgz
+python_dir: /tmp/Python-3.5.6
+tmpdir_force: true
+tomcat_mirror: http://mirrors.estointernet.in
+tomcat_version7: 7.0.92
+tomcat_version: 7.0
+tomcat_non_ssl_connector_port: 8090
+tomcat_ssl_connector_port: 8443
+tomcat_shutdown_port: 8005
+tomcat_ajp_port: 8009
+#nodejs_version: "6.x"
+firewall_allowed_tcp_ports:
+  - "22"
+  - "25"
+  - "80"
+  - "443"
+  - "8080"
+virtualbox_version: 6.0 
+virtualbox_minor_version: 6.0.4
+virtualbox_extpack_version: "6.0.4.vbox-extpack-6.0.4_128413_el7-1.x86_64.rpm"
+vagrant_version: 2.2.2

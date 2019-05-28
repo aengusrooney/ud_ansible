@@ -1,0 +1,28 @@
+{
+      "roles": [
+        {
+          "group": "ALERTPUBLISHER",
+          "hosts": [
+            "tnode2.unraveldata.com"
+          ]
+        },
+        {
+          "group": "EVENTSERVER",
+          "hosts": [
+            "tnode2.unraveldata.com"
+          ]
+        },
+        {
+          "group": "HOSTMONITOR",
+          "hosts": [
+            "tnode2.unraveldata.com"
+          ]
+        },
+        {
+          "group": "SERVICEMONITOR",
+          "hosts": [
+            "tnode2.unraveldata.com"
+          ]
+        }
+      ]
+    }

@@ -1,0 +1,39 @@
+---
+- hosts: jenkins
+  gather_facts: yes
+  remote_user: topcat
+  become: true
+  become_method: sudo
+
+  tasks:
+
+       - name: Update the software package repository 
+         yum: update_cache=yes
+         when: ansible_os_family == "RedHat"
+
+       - name: Install VirtualBox dependencies
+         yum:
+          name: epel-release, kernel-devel, kernel-headers, make, patch, gcc
+         when: ansible_os_family == "RedHat"
+
+       - name: Add VirtualBox Yum repository
+         yum_repository:
+           name: epel
+           description: VirtualBox YUM repo
+           baseurl: https://download.virtualbox.org/virtualbox/rpm/el/virtualbox.repo
+           gpgcheck: yes
+         when: ansible_os_family == "RedHat"
+
+       - name: Install VirtualBox
+         yum:
+           name: VirtualBox-{{ virtualbox_version }}
+         when: ansible_os_family == "RedHat"
+
+       - name: Starting and Enabling VirtualBox service
+         service:
+          name: vboxdrv
+          state: started
+          enabled: yes
+         when: ansible_os_family == "RedHat"
+  vars_files:
+    - vars/main.yml

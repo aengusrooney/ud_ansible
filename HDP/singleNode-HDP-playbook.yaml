@@ -1,0 +1,59 @@
+---
+- name: Ambari Server/Agent Install
+  hosts: all
+  remote_user: root
+  become: true
+
+  tasks:
+  - name: install epel
+    yum:
+      name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+      state: installed
+    when:
+      - ansible_facts['distribution_major_version'] == "7"
+  - name: Add Ambari Repo
+    yum_repository:
+      name: ambari
+      description: ambari-2.6.2.2
+      baseurl: http://public-repo-1.hortonworks.com/ambari/centos7/2.x/updates/2.6.2.2
+      gpgkey: http://public-repo-1.hortonworks.com/ambari/centos7/2.x/updates/2.6.2.2/RPM-GPG-KEY/RPM-GPG-KEY-Jenkins
+      gpgcheck: yes
+      priority: 1
+  - name: Install mysql connector
+    yum:
+      name: mysql-connector-java*
+      state: installed
+  - name: Install Ambari Server
+    yum:
+      name: ambari-server
+      state: installed
+  - name: Setup Ambari Server
+    command: ambari-server setup -s
+  - name: Install Ambari Agent
+    yum:
+      name: ambari-agent
+      state: installed
+  - lineinfile:
+      path: /etc/ambari-agent/conf/ambari-agent.ini
+      regexp: '^hostname='
+      line: 'hostname=tnode1.unraveldata.com'
+  - lineinfile:
+      path: /etc/ambari-agent/conf/ambari-agent.ini
+      regexp: '^\[security\]'
+      line: "[security]\nforce_https_protocol=PROTOCOL_TLSv1_2"
+  - name: Link mysql-connector.jar
+    command: ls -al /usr/share/java/mysql-connector-java.jar
+    command: ln -s /usr/share/java/mysql-connector-java.jar /var/lib/ambari-server/resources/mysql-connector-java.jar
+    ignore_errors: yes
+  - name: Enable Ambari Server
+    command: ambari-server start
+    ignore_errors: yes
+  - name: Enable Ambari agent
+    command: ambari-agent start
+    ignore_errors: yes
+  - name: install libtirpc-devel 0.2.4
+    yum:
+      name: https://s3.amazonaws.com/unraveldatarepo/libtirpc-devel-0.2.4-0.15.el7.x86_64.rpm
+      state: installed
+    when:
+      - ansible_facts['distribution_major_version'] == "7"

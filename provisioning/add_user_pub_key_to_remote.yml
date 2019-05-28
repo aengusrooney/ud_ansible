@@ -1,0 +1,11 @@
+---
+- hosts: all
+  become: yes
+  become_user: root 
+  tasks:
+ 
+    - name: Set up authorized keys for the user
+      authorized_key: user=topcat key="{{item}}"
+      with_file:
+        - /Users/raghu/.ssh/id_rsa.pub
+

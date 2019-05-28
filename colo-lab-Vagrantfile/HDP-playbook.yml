@@ -1,0 +1,118 @@
+---
+- name: Ambari Agent Install
+  hosts: agent,server
+  become: true
+  remote_user: vagrant
+  become_method: sudo
+  vars:
+    java_home: /usr/java/jdk1.8.0_112
+
+  tasks:
+  - name: disable ipv6
+    sysctl:
+      name: "{{ item }}"
+      value: 1
+      state: present
+    with_items:
+      - net.ipv6.conf.all.disable_ipv6
+      - net.ipv6.conf.default.disable_ipv6
+  - name: install epel
+    yum:
+      name: https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+      state: installed
+    when:
+      - ansible_facts['distribution_major_version'] == "7"
+  - name: install JDK 8
+    yum:
+      name: https://s3.amazonaws.com/unraveldatarepo/jdk-8u112-linux-x64.rpm
+      state: installed
+  - name: Install unzip
+    yum:
+      name: unzip
+      state: installed
+  - name: Download JCE unlimited policy
+    get_url:
+      url: https://s3.amazonaws.com/unraveldatarepo/jce_policy-8.zip
+      dest: "/tmp/jce_policy-8.zip"
+  - name: Unzip JCE unlimited policy files
+    unarchive:
+      src: "/tmp/jce_policy-8.zip"
+      dest: "/tmp/"
+      remote_src: yes
+  - name: Install US_export_policy.jar
+    copy:
+      src: "{{ item.path }}"
+      dest: "{{ java_home }}/jre/lib/security/{{ item.name }}"
+      remote_src: yes
+    with_items:
+      - { path: '/tmp/UnlimitedJCEPolicyJDK8/US_export_policy.jar', name: 'US_export_policy.jar' }
+      - { path: '/tmp/UnlimitedJCEPolicyJDK8/local_policy.jar', name: 'local_policy.jar' }
+  - name: Add Ambari Repo
+    yum_repository:
+      name: ambari
+      description: "ambari-{{ ambari_ver }}"
+      baseurl: "http://public-repo-1.hortonworks.com/ambari/centos7/2.x/updates/{{ ambari_ver }}"
+      gpgkey: "http://public-repo-1.hortonworks.com/ambari/centos7/2.x/updates/{{ ambari_ver }}/RPM-GPG-KEY/RPM-GPG-KEY-Jenkins"
+      gpgcheck: yes
+      priority: 1
+  - name: Install Ambari Agent
+    yum:
+      name: ambari-agent
+      state: latest
+  - lineinfile:
+      path: /etc/ambari-agent/conf/ambari-agent.ini
+      regexp: '^hostname='
+      line: "hostname={{ ambari_hostname }}"
+  - lineinfile:
+      path: /etc/ambari-agent/conf/ambari-agent.ini
+      regexp: '^\[security\]'
+      line: "[security]\nforce_https_protocol=PROTOCOL_TLSv1_2"
+  - name: Enable Ambari agent
+    command: ambari-agent start
+    ignore_errors: yes
+  - name: install libtirpc-devel 0.2.4
+    yum:
+      name: https://s3.amazonaws.com/unraveldatarepo/libtirpc-devel-0.2.4-0.15.el7.x86_64.rpm
+      state: installed
+    when:
+      - ansible_facts['distribution_major_version'] == "7"
+
+
+- name: Ambari Server Install
+  hosts: server
+  become: true
+  remote_user: vagrant
+  become_method: sudo
+
+  tasks:
+  - name: Add Ambari Repo
+    yum_repository:
+      name: ambari
+      description: "ambari-{{ ambari_ver }}"
+      baseurl: "http://public-repo-1.hortonworks.com/ambari/centos7/2.x/updates/{{ ambari_ver }}"
+      gpgkey: "http://public-repo-1.hortonworks.com/ambari/centos7/2.x/updates/{{ ambari_ver }}/RPM-GPG-KEY/RPM-GPG-KEY-Jenkins"
+      gpgcheck: yes
+      priority: 1
+  - name: Install mysql connector
+    yum:
+      name: mysql-connector-java*
+      state: latest
+  - name: Install Ambari Server
+    yum:
+      name: ambari-server
+      state: latest
+  - name: Setup Ambari Server
+    command: "ambari-server setup -s --java-home={{ java_home }}"
+  - name: Link mysql-connector.jar
+    command: ls -al /usr/share/java/mysql-connector-java.jar
+    command: ln -s /usr/share/java/mysql-connector-java.jar /var/lib/ambari-server/resources/mysql-connector-java.jar
+    ignore_errors: yes
+  - name: Enable Ambari Server
+    command: ambari-server start
+    ignore_errors: yes
+  - name: install libtirpc-devel 0.2.4
+    yum:
+      name: https://s3.amazonaws.com/unraveldatarepo/libtirpc-devel-0.2.4-0.15.el7.x86_64.rpm
+      state: installed
+    when:
+      - ansible_facts['distribution_major_version'] == "7"

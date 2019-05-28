@@ -1,0 +1,9 @@
+---
+- src: gantsign.java
+- src: gantsign.maven 
+- src: geerlingguy.jenkins
+- src: geerlingguy.ruby
+- src: mdklatt.python3 
+- src: geerlingguy.git
+- src: robertdebock.tomcat
+- src: geerlingguy.nodejs

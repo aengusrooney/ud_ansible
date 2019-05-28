@@ -1,0 +1,40 @@
+---
+# Install Ansible 
+
+- name: 1.Check if EPEL repo is already configured.
+  stat: path={{ epel_repofile_path }}
+  register: epel_repofile_result
+ 
+- name: 2.Install EPEL repo.
+  yum:
+    name: "{{ epel_repo_url }}"
+    state: present
+  register: result
+  when: not epel_repofile_result.stat.exists
+ 
+- name: 3.Import EPEL GPG key.
+  rpm_key:
+    key: "{{ epel_repo_gpg_key_url }}"
+    state: present
+  when: not epel_repofile_result.stat.exists
+
+- name: Add repository
+  yum_repository:
+    name: epel
+    description: EPEL YUM repo
+    baseurl: "{{ epel_repo_url }}"
+    enabled: yes
+
+- name: Enable ansible repo
+  command: "yum — enablerepo=epel install ansible"
+
+- name: 4.Install epel-release
+  yum: name=epel-release
+       state=present
+
+- name: 5. Update Cache
+  yum: update_cache=yes
+
+- name: 6.Install ansible
+  yum: name=ansible
+       state=present

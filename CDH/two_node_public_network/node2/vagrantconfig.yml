@@ -1,0 +1,16 @@
+master_memory_size: 25360
+master_number_cpus: 8
+number_cpus: 8
+memory_size: 25360
+master_box: "cosm/centos7"
+box: "cosm/centos7"
+master_ip: "172.36.2.128"
+master_disk_size: "100GB"
+eth: "enp3s0f0"
+master: "tnode28"
+gateway: "172.36.0.254"
+nameserver: "172.36.1.213"
+devops_repo_path: "../../../../devops"
+gateway: 172.36.0.254
+dns: 172.36.1.213
+cdh_version: 5.15.1 

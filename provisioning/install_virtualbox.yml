@@ -1,0 +1,105 @@
+---
+- hosts: all
+  gather_facts: yes
+  remote_user: topcat
+  become: true
+  become_method: sudo
+
+  tasks:
+
+       - name: Update the software package repository 
+         yum: update_cache=yes
+         when: ansible_os_family == "RedHat"
+
+       - name: Get Kernel version info
+         command: uname -r
+         register: ker_info
+
+       - debug:
+           var: ker_info
+
+       - name: Install VirtualBox dependencies
+         yum:
+          name: "kernel-devel-{{ ker_info.stdout }}" 
+         when: ansible_os_family == "RedHat"
+
+       - name: Install VirtualBox dependencies
+         yum:
+          name: epel-release, kernel-headers, make, patch, gcc
+         when: ansible_os_family == "RedHat"
+
+       - name: Download VirtualBox rpm
+         get_url:
+           url: "http://download.virtualbox.org/virtualbox/rpm/rhel/{{ ansible_distribution_major_version }}/x86_64/VirtualBox-{{ virtualbox_version }}-6.0.4_128413_el7-1.x86_64.rpm"
+           dest: /tmp/
+           force: yes
+         register: download_vbox_result
+         when: ansible_os_family == "RedHat"
+
+       - name: Output downloaded VirtualBox extension pack file name
+         debug:
+           var: download_vbox_result.dest
+           verbosity: 1
+         when: ansible_os_family == "RedHat"
+       
+       - name: Disable epel 
+         command: yum-config-manager --disable epel
+
+       - name: Install VirtualBox package
+         yum:
+           name: /tmp/VirtualBox-{{ virtualbox_version }}-6.0.4_128413_el7-1.x86_64.rpm
+           state: present
+        # /sbin/vboxconfig #
+
+       - name: Starting and Enabling VirtualBox service
+         service:
+          name: vboxdrv
+          state: started
+          enabled: yes
+         when: ansible_os_family == "RedHat"
+
+# If the service fails , please restart the machine #
+       - name: Execute VBoxManage Command
+         command: VBoxManage --version
+         register: vbox_ver
+         tags: verify_vbox
+
+       - debug:
+           var: vbox_ver 
+         tags: verify_vbox
+
+       - name: Verify VirtualBox Version
+         assert:
+          that:
+            - "'{{ virtualbox_version }}' in vbox_ver.stdout"
+         tags: verify_vbox
+
+       - name: Check if extension pack is already installed
+         shell: "VBoxManage list extpacks"
+         register: extpack_list
+
+       - name: Output installed extpacks
+         debug:
+           var: extpack_list.stdout
+           verbosity: 1
+
+       - name: Download VirtualBox extension pack
+         get_url:
+           url: "https://download.virtualbox.org/virtualbox/{{ virtualbox_minor_version }}/Oracle_VM_VirtualBox_Extension_Pack-{{ virtualbox_minor_version }}.vbox-extpack"
+           dest: /tmp/
+           force: yes
+         register: download_ext_result
+         when: 'extpack_list.stdout == "Extension Packs: 0"'
+
+       - name: Output downloaded VirtualBox extension pack file name
+         debug:
+           var: download_ext_result.dest
+           verbosity: 1
+         when: 'extpack_list.stdout == "Extension Packs: 0"'
+        
+       - name: Install VirtualBox extension pack
+         shell: "echo 'y' |VBoxManage extpack install --replace {{ download_ext_result.dest }}"
+         when: 'extpack_list.stdout == "Extension Packs: 0"'
+
+  vars_files:
+    - vars/main.yml

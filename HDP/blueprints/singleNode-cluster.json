@@ -1,0 +1,9 @@
+{ "blueprint":"HDP",
+  "default_password" : "admin",
+  "host_groups":[
+    {
+      "name":"host_group_1",
+      "host_count": 1
+    }
+  ]
+}

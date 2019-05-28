@@ -1,0 +1,18 @@
+---
+- hosts: master
+  connection: local
+  tasks:
+
+    - name: Compress directory /usr/local/unravel-agent  into /tmp/unravel-agent.tgz 
+      archive:
+        path: /usr/local/unravel-agent
+        dest: /tmp/unravel-agent.tgz
+
+- hosts: slaves
+  become: yes
+  tasks:
+
+    - name: Unarchive a file that is already on the remote machine
+      unarchive:
+            src: /tmp/unravel-agent.tgz
+            dest: /usr/local/

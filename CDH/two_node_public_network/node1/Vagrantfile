@@ -1,0 +1,107 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+CONF = YAML.load(File.open(File.join(File.dirname(__FILE__), "vagrantconfig.yml"), File::RDONLY).read)
+
+hosts_script=''
+ansible_hosts=''
+
+def get_ansible_hosts_file(master)
+ansible_hosts = <<-SCRIPT
+echo Editing ansible hosts file to add #{CONF['master']}
+sed -i 's/tnode1/#{CONF['master']}.unraveldata.com/g' /devops/cloudera_install/cloudera_install/hosts
+sed -i 's/tnode1.unraveldata.com/#{CONF['master']}.unraveldata.com/g' /devops/cloudformation/cloudera/template/clouera-single-node.json 
+sed -i 's/tnode1.unraveldata.com/#{CONF['master']}.unraveldata.com/g' /devops/cloudformation/cloudera/template/cm_install.json 
+ln -sf /devops/cloudformation/cloudera/template/ /devops/template
+SCRIPT
+end
+
+def create_shell_script(hostname, gateway, dns)
+script = <<-SCRIPT
+echo Editing /etc/hosts file
+sed -i '/^127.0.0.1\\s*#{hostname}.unraveldata.com/d' /etc/hosts
+sed -i '/^::1/d' /etc/hosts
+sed -i 's/SELINUX\=permissive/SELINUX\=disabled/' /etc/selinux/config
+IPADDRESS=`ifconfig eth1 |grep inet  |grep netmask |grep 172 |awk '{print $2}'`
+sed -i '/unraveldata\.com/d' /etc/hosts
+echo "$IPADDRESS $HOSTNAME" >> /etc/hosts
+nmcli con mod "eth1" ifname eth1  ip4 $IPADDRESS/16 gw4 #{gateway}  ipv4.dns "#{dns}"
+#nmcli con mod "eth1" ifname eth1  ip4 $IPADDRESS/16 gw4 172.36.0.254  ipv4.dns "172.36.1.213" 
+nmcli connection up eth1
+sed -i 's/ONBOOT\=no/ONBOOT\=yes/' /etc/sysconfig/network-scripts/ifcfg-eth1
+systemctl stop NetworkManager
+systemctl disable NetworkManager
+echo Sleeing 10
+sleep 10
+sed -i 's:nameserver 10.0.2.3::' /etc/resolv.conf
+route del -net 0.0.0.0/0 gw 10.0.2.2
+echo Making crontab for reboot
+echo -e "@reboot route del -net 0.0.0.0/0 gw 10.0.2.2\n@reboot sed -i 's:nameserver 10.0.2.3::' /etc/resolv.conf" >> rjob
+crontab rjob
+echo Sleep 15
+echo Changing SSHD
+sed -i 's:PasswordAuthentication no:PasswordAuthentication yes:' /etc/ssh/sshd_config
+sed -i 's:\#PermitRootLogin yes:PermitRootLogin yes:' /etc/ssh/sshd_config
+systemctl reload sshd
+echo "topcat            ALL=(ALL)       NOPASSWD: ALL" >> /etc/sudoers
+echo Expanding disk
+yum install -y cloud-utils-growpart
+yum install -y e2fsprogs
+growpart /dev/sda 1
+resize2fs /dev/sda1
+echo changing root password
+echo "unraveldata" | passwd root --stdin
+echo  adding topcat user
+useradd topcat
+echo "unraveldata" | passwd topcat --stdin
+SCRIPT
+end
+
+puts "Following are the Cofig values specified #{$msg}"
+CONF.each do |key, value|
+  puts "The Config key is #{key} and the value is #{value}."
+end
+
+Vagrant.configure("2") do |config|
+  config.hostmanager.enabled = true
+  config.vm.define CONF['master'] do |master|
+    master.vm.box = CONF['master_box']
+    config.vm.network :public_network , bridge: "enp3s0f0" , ip: "#{CONF['master_ip']}" , netmask:"255.255.0.0" , auto_config: false
+    config.disksize.size = CONF['master_disk_size'] 
+    master_hostname = "#{CONF['master']}"
+    master_fqdn = "#{master_hostname}.unraveldata.com"
+    master.vm.hostname = master_fqdn
+    master.vm.provider :virtualbox do |vb|
+      vb.customize ["modifyvm", :id, "--memory", CONF['master_memory_size']]
+      vb.customize ['modifyvm', :id, '--cpus', CONF['master_number_cpus']]
+    end
+    #master.vm.synced_folder "#{CONF['devops_repo_path']}", "/devops"
+    master.vm.provision :host_shell do |host_shell|
+      host_shell.inline ="cp -f ./.vagrant/machines/#{CONF['master']}/virtualbox/private_key ./#{CONF['master']}_key"
+    end 
+  # Add the ip to FQDN and hostname mapping in /etc/hosts
+    master.hostmanager.aliases = "#{master_fqdn} #{master_hostname}"
+    hosts_script= create_shell_script(CONF['master'], CONF['gateway'], CONF['dns'])
+    master.vm.provision "shell",
+     run: "always",
+     inline: "sudo ip link set eth1 down && sleep 60"
+    master.vm.provision "shell",
+     run: "always",
+     inline: "ip addr add #{CONF['master_ip']}/16 dev eth1 && ip link set eth1 up"
+     #inline: "ip addr add 172.36.2.127/16 dev eth1 && ip link set eth1 up"
+    master.vm.provision "shell",
+      run: "always",
+      inline: "sudo yum update -y; sudo yum -y install net-tools"
+    master.vm.provision "shell",
+      run: "always",
+      inline: "sudo route add -net 0.0.0.0/0 gw #{CONF['gateway']}"
+    master.vm.provision "shell",
+      run: "always",
+      #inline: " echo \'nameserver #{CONF['nameserver']}\' > /etc/resolv.conf"
+      inline: " echo 'nameserver 172.36.1.213' > /etc/resolv.conf"
+    
+    master.vm.provision "shell", inline: "#{hosts_script}"
+    #master.vm.provision "shell", inline: "cd /devops; python cloudformation/cloudera/cluster.py --host #{CONF['master_ip']} -t cloudformation/cloudera/template/clouera-single-node.json -a deploy-template -v #{CONF['cdh_version']}"
+    #master.vm.provision "shell", inline: "cd /devops; python cloudformation/cloudera/cluster.py --host #{CONF['master_ip']} -a deploy-cms"
+  end
+ end

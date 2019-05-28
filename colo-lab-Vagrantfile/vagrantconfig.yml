@@ -1,0 +1,8 @@
+memory_size: MEMSIZE
+number_cpus: CPU
+box: "cosm/centos7"
+ip: "NODEIP"
+# congo55 - 74 eth: "eno4"
+eth: "enp3s0f0"
+worker: "NODENAME"
+disk_size: "100GB"

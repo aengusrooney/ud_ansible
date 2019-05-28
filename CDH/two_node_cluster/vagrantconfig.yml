@@ -1,0 +1,13 @@
+master_memory_size: 25360
+master_number_cpus: 6
+master_ports: 7180, 7190
+worker_memory_size: 15360
+worker_number_cpus: 6
+worker_ports: 8090, 8070
+box: "cosm/centos7"
+ip: "10.0.15.3"
+eth: "enp3s0f0"
+master: "tnode2"
+workers: "snode"
+worker_instances: 1
+cdh_version: 5.15.1

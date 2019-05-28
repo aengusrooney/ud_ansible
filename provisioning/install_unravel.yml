@@ -1,0 +1,146 @@
+---
+- hosts: all
+  gather_facts: yes
+  remote_user: topcat
+  become: true
+  become_method: sudo
+
+  tasks:
+
+       - name: Download Unravel rpm
+         get_url:
+           url: "https://preview.unraveldata.com/unravel/staging-RPM/{{unravel_version}}/unravel-{{rpm_version}}-1.{{ansible_architecture}}.rpm"
+           #url: "https://preview.unraveldata.com/unravel/staging-RPM/unravel-4.5.1.0b0162-1.x86_64.rpm"
+           dest: /tmp/
+           url_username: "{{unravel_user}}"
+           url_password: "{{unravel_password}}"
+           force: no
+         register: download_unravel
+         when: ansible_os_family == "RedHat"
+         tags: download_rpm
+
+       - name: Output downloaded Unravel file name
+         debug:
+           var: download_unravel.dest
+           verbosity: 1
+         when: ansible_os_family == "RedHat"
+
+       - name: check if unravel exists 
+         stat: 
+           path: /etc/init.d/unravel_all.sh 
+         register: unravell_all
+
+       - name: Stop unravel services
+         command: /etc/init.d/unravel_all.sh stop
+         when: unravell_all.stat.exists == True
+         
+# Stop all services before removing 
+# Check for any Stale unravel processes & kill if any found !!
+# [topcat@fargo12 ~]$ ps -ef | grep ident=unravel_
+#topcat   15395  1561  0 08:52 pts/4    00:00:00 grep --color=auto ident=unravel_
+#hdfs     16504     1  0 Jan20 ?        01:02:29 /usr/local/unravel/jre/bin/java -cp /usr/local/unravel/etc:/usr/local/unravel/dlib/common/*:/usr/local/unravel/dlib/unravel/*:/usr/local/unravel/dlib/mybatis/*:/usr/local/unravel/dlib/cdh5.4.x/*:/usr/local/unravel/bin/bootstrap.jar:/usr/local/unravel/bin/tomcat-juli.jar -Dident=unravel_ps -Dunravel.log.dir=/usr/local/unravel/logs com.unraveldata.pubsub.UnravelStatus periodic json
+#hdfs     20517     1  0 Jan20 ?        01:02:51 /usr/local/unravel/jre/bin/java -cp /usr/local/unravel/etc:/usr/local/unravel/dlib/common/*:/usr/local/unravel/dlib/unravel/*:/usr/local/unravel/dlib/mybatis/*:/usr/local/unravel/dlib/cdh5.4.x/*:/usr/local/unravel/bin/bootstrap.jar:/usr/local/unravel/bin/tomcat-juli.jar -Dident=unravel_ps -Dunravel.log.dir=/usr/local/unravel/logs com.unraveldata.pubsub.UnravelStatus periodic json
+
+       - name: Cleanup unravel install and data folders if clean install
+         file:
+           state: absent
+           path: "{{ item }}/"
+         with_items:
+          - '/usr/local/unravel'
+          - '/srv/unravel/*' #unravel/* and /srv/unravel , is there a difference ? 
+          - '/etc/unravel_ctl'
+         when: clean_install == "YES"
+
+       - name: Install Unravel
+         yum:
+           name: /tmp/unravel-{{rpm_version}}-1.{{ansible_architecture}}.rpm
+           state: present
+           allow_downgrade: yes
+         tags: install_rpm
+
+       - name: Populate service facts
+         service_facts:
+         tags: get_services
+
+       - name: Run await_fixups.sh  script
+         command: /usr/local/unravel/install_bin/await_fixups.sh
+         register: await_fixups
+         tags: await_fixups
+     
+       - debug:
+          var: await_fixups
+         tags: await_fixups
+
+# For HDP & MAPr
+# sudo /etc/init.d/unravel_all.sh stop
+# sudo /usr/local/unravel/install_bin/switch_to_hdp.sh/switch_to_mapr.sh
+
+
+       - name: Stop unravel services
+         command: /etc/init.d/unravel_all.sh stop
+         tags: stop_unravel
+         when: cluster_type == "hdp" or cluster_type == "mapr"
+
+       - name: Switch to Provider HDP/MAPR
+         command: /usr/local/unravel/install_bin/switch_to_{{cluster_type}}.sh
+         register: switch_provider
+         tags: switch_provider
+         when: cluster_type == "hdp" or cluster_type == "mapr"
+     
+       - debug:
+          var: switch_provider
+         tags: switch_provider
+         when: cluster_type == "hdp" or cluster_type == "mapr"
+
+       - name: Switch User
+         command: /usr/local/unravel/install_bin/switch_to_user.sh {{switch_user_usr}} {{switch_user_group}}
+         register: switch_user
+         tags: switch_user
+     
+       - debug:
+          var: switch_user
+         tags: switch_user
+
+       - name: Start all services
+         command: /etc/init.d/unravel_all.sh start
+         register: start_services
+         ignore_errors: True
+         tags: start_services
+     
+       - debug:
+          var: start_services
+         tags: start_services
+
+       - name: Print Unravel Version Info
+         debug:
+           var: ansible_facts.services
+         tags: get_services
+
+
+       - name: Execute Unravel Command
+         uri:
+           url: "http://{{ansible_ssh_host}}:3000/version.txt"
+           return_content: yes
+         register: unravel_version
+         tags: get_unravel_version
+
+       - name: Print Unravel Version Info
+         debug:
+           var: unravel_version.content
+         tags: get_unravel_version
+
+       - name: Verify Unravel Version
+         assert:
+          that:
+            - unravel_version.content is search('{{ rpm_version }}')
+         tags: get_unravel_version
+
+  vars:
+    rpm_version: 4.5.1.0b0162
+    unravel_user: unravel
+    unravel_password: WillowRoad68
+    unravel_version: 4.5.1
+    clean_install: 'NO'
+    cluster_type: 'cdh'
+    switch_user_usr: 'hdfs'
+    switch_user_group: 'hadoop'
